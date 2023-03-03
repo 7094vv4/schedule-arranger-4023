@@ -8,12 +8,14 @@ const Candidate = require('../models/candidate');
 const User = require('../models/user');
 const Availability = require('../models/availability');
 const Comment = require('../models/comment');
+const csrf = require('csurf');
+const csrfProtection = csrf({ cookie: true });
 
-router.get('/new', authenticationEnsurer, (req, res, next) => {
-  res.render('new', { user: req.user });
+router.get('/new', authenticationEnsurer, csrfProtection, (req, res, next) => {
+  res.render('new', { user: req.user, csrfToken: req.csrfToken() });
 });
 
-router.post('/', authenticationEnsurer, async (req, res, next) => {
+router.post('/', authenticationEnsurer, csrfProtection, async (req, res, next) => {
   const scheduleId = uuidv4();
   const updatedAt = new Date();
   await Schedule.create({
@@ -65,9 +67,9 @@ router.get('/:scheduleId', authenticationEnsurer, async (req, res, next) => {
     // 閲覧ユーザーと出欠に紐づくユーザーからユーザー Map (キー:ユーザー ID, 値:ユーザー) を作る
     const userMap = new Map(); // key: userId, value: User
     userMap.set(parseInt(req.user.id), {
-        isSelf: true,
-        userId: parseInt(req.user.id),
-        username: req.user.username
+      isSelf: true,
+      userId: parseInt(req.user.id),
+      username: req.user.username
     });
     availabilities.forEach((a) => {
       userMap.set(a.user.userId, {
@@ -111,7 +113,7 @@ router.get('/:scheduleId', authenticationEnsurer, async (req, res, next) => {
   }
 });
 
-router.get('/:scheduleId/edit', authenticationEnsurer, async (req, res, next) => {
+router.get('/:scheduleId/edit', authenticationEnsurer, csrfProtection, async (req, res, next) => {
   const schedule = await Schedule.findOne({
     where: {
       scheduleId: req.params.scheduleId
@@ -125,7 +127,8 @@ router.get('/:scheduleId/edit', authenticationEnsurer, async (req, res, next) =>
     res.render('edit', {
       user: req.user,
       schedule: schedule,
-      candidates: candidates
+      candidates: candidates,
+      csrfToken: req.csrfToken()
     });
   } else {
     const err = new Error('指定された予定がない、または、予定する権限がありません');
@@ -138,7 +141,7 @@ function isMine(req, schedule) {
   return schedule && parseInt(schedule.createdBy) === parseInt(req.user.id);
 }
 
-router.post('/:scheduleId', authenticationEnsurer, async (req, res, next) => {
+router.post('/:scheduleId', authenticationEnsurer, csrfProtection, async (req, res, next) => {
   let schedule = await Schedule.findOne({
     where: {
       scheduleId: req.params.scheduleId
@@ -206,7 +209,7 @@ async function createCandidatesAndRedirect(candidateNames, scheduleId, res) {
       scheduleId: scheduleId
     };
   });
-  await Candidate.bulkCreate(candidates)
+  await Candidate.bulkCreate(candidates);
   res.redirect('/schedules/' + scheduleId);
 }
 
